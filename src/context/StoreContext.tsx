@@ -1,7 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { computeTotal } from "../data/catalog";
+import { computeTotal, DEFAULT_CONFIG } from "../data/catalog";
 import type { CandleConfig, SummaryLine } from "../data/catalog";
+import { loadProducts, newProductId, persistProducts } from "../data/products";
+import type { CustomProduct } from "../data/products";
 
 export type Page =
   | "home"
@@ -13,12 +15,16 @@ export type Page =
   | "contact"
   | "cart"
   | "checkout"
-  | "confirmation";
+  | "confirmation"
+  | "boutique"
+  | "admin";
 
 export interface CartItem {
   id: string;
   config: CandleConfig;
   qty: number;
+  /** Present when the line is a real product from the boutique. */
+  product?: CustomProduct;
 }
 
 export interface SavedDesign {
@@ -33,7 +39,7 @@ export interface PlacedOrder {
   email: string;
   name: string;
   total: number;
-  lines: { itemLines: SummaryLine[]; qty: number; total: number }[];
+  lines: { itemLines: SummaryLine[]; qty: number; total: number; product?: { name: string; image: string } }[];
   shipping: string;
 }
 
@@ -42,6 +48,7 @@ interface StoreValue {
   navigate: (p: Page) => void;
   cart: CartItem[];
   addToCart: (config: CandleConfig) => void;
+  addProductToCart: (product: CustomProduct) => void;
   removeItem: (id: string) => void;
   setQty: (id: string, qty: number) => void;
   clearCart: () => void;
@@ -56,6 +63,10 @@ interface StoreValue {
   notify: (msg: string) => void;
   order: PlacedOrder | null;
   placeOrder: (info: { email: string; name: string; shipping: string }, lines: PlacedOrder["lines"]) => PlacedOrder;
+  products: CustomProduct[];
+  addProduct: (p: Omit<CustomProduct, "id" | "createdAt">) => CustomProduct;
+  updateProduct: (id: string, patch: Partial<Omit<CustomProduct, "id" | "createdAt">>) => void;
+  deleteProduct: (id: string) => void;
 }
 
 const StoreContext = createContext<StoreValue | null>(null);
@@ -86,6 +97,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [draft, setDraft] = useState<CandleConfig | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [order, setOrder] = useState<PlacedOrder | null>(null);
+  const [products, setProducts] = useState<CustomProduct[]>(() => loadProducts());
   const toastTimer = useRef<number | null>(null);
 
   useEffect(() => persist("rc-cart", cart), [cart]);
@@ -102,10 +114,46 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     toastTimer.current = window.setTimeout(() => setToast(null), 3000);
   }, []);
 
+  useEffect(() => {
+    if (!persistProducts(products)) notify("Storage is full — use smaller photos or image URLs");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products]);
+
   const addToCart = useCallback(
     (config: CandleConfig) => {
       setCart((prev) => [...prev, { id: uid(), config, qty: 1 }]);
       notify("Your candle has been added to the cart");
+    },
+    [notify],
+  );
+
+  const addProductToCart = useCallback(
+    (product: CustomProduct) => {
+      setCart((prev) => [...prev, { id: uid(), config: { ...DEFAULT_CONFIG }, qty: 1, product }]);
+      notify(`“${product.name}” has been added to the cart`);
+    },
+    [notify],
+  );
+
+  /* ---- real products (Atelier Manager) ---- */
+  const addProduct = useCallback(
+    (p: Omit<CustomProduct, "id" | "createdAt">) => {
+      const created: CustomProduct = { ...p, id: newProductId(), createdAt: Date.now() };
+      setProducts((prev) => [created, ...prev]);
+      notify(`“${created.name}” is now in the boutique`);
+      return created;
+    },
+    [notify],
+  );
+
+  const updateProduct = useCallback((id: string, patch: Partial<Omit<CustomProduct, "id" | "createdAt">>) => {
+    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+  }, []);
+
+  const deleteProduct = useCallback(
+    (id: string) => {
+      setProducts((prev) => prev.filter((p) => p.id !== id));
+      notify("Product removed from the boutique");
     },
     [notify],
   );
@@ -142,13 +190,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   );
 
   const cartCount = useMemo(() => cart.reduce((s, i) => s + i.qty, 0), [cart]);
-  const cartTotal = useMemo(() => cart.reduce((s, i) => s + computeTotal(i.config) * i.qty, 0), [cart]);
+  const cartTotal = useMemo(
+    () => cart.reduce((s, i) => s + (i.product ? i.product.price : computeTotal(i.config, products)) * i.qty, 0),
+    [cart, products],
+  );
 
   const value: StoreValue = {
     page,
     navigate,
     cart,
     addToCart,
+    addProductToCart,
     removeItem,
     setQty,
     clearCart,
@@ -163,6 +215,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     notify,
     order,
     placeOrder,
+    products,
+    addProduct,
+    updateProduct,
+    deleteProduct,
   };
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

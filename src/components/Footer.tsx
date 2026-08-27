@@ -29,6 +29,7 @@ export default function Footer() {
       title: "Shop",
       links: [
         { label: "Create Your Candle", page: "create" },
+        { label: "La Boutique", page: "boutique" },
         { label: "Signature Designs", page: "home" },
         { label: "Personalisation", page: "create" },
       ],
@@ -40,6 +41,7 @@ export default function Footer() {
         { label: "FAQ", page: "faq" },
         { label: "Contact", page: "contact" },
         { label: "Returns", page: "faq" },
+        { label: "Atelier Manager", page: "admin" },
       ],
     },
     {

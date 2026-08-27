@@ -22,6 +22,7 @@ import {
 } from "../data/catalog";
 import type { CandleConfig, OptionDef } from "../data/catalog";
 import { DEFAULT_CONFIG } from "../data/catalog";
+import type { CustomProduct } from "../data/products";
 
 /* ---------- accordion section shell ---------- */
 function Section({
@@ -120,8 +121,63 @@ function priceLabel(opt: OptionDef, isBase = false): string {
 
 /* ==================================================================== */
 
+/* ---------- real product photo card ---------- */
+function PhotoCard({ p, selected, onSelect }: { p: CustomProduct; selected: boolean; onSelect: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={selected}
+      className={`group relative flex w-full items-center gap-3.5 border px-3.5 py-3 text-left transition-all duration-300 ${
+        selected ? "border-gold bg-ivory shadow-soft" : "border-gold-pale bg-ivory hover:-translate-y-0.5 hover:border-gold-soft hover:shadow-soft"
+      }`}
+    >
+      <span className="h-11 w-11 shrink-0 overflow-hidden rounded-full border border-black/5">
+        <img src={p.image} alt={p.name} className="h-full w-full object-cover" loading="lazy" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[13px] font-semibold text-ink">{p.name}</span>
+        <span className="block truncate text-[11.5px] text-ink-faint">{p.detail ?? p.description}</span>
+      </span>
+      <span className={`shrink-0 text-[13px] font-bold ${selected ? "text-gold-deep" : "text-ink-soft"}`}>{fmt(p.price)}</span>
+      {selected && (
+        <span className="absolute -right-px -top-px flex h-5 w-5 items-center justify-center bg-gold text-ivory">
+          <CheckIcon className="h-3 w-3" />
+        </span>
+      )}
+    </button>
+  );
+}
+
+function AtelierShelf({
+  items,
+  selectedId,
+  onPick,
+  hint,
+}: {
+  items: CustomProduct[];
+  selectedId?: string | null;
+  onPick: (p: CustomProduct) => void;
+  hint?: string;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <div className="fade-soft mt-5">
+      <p className="mb-2.5 flex items-center gap-2 text-[10.5px] font-bold uppercase tracking-[0.2em] text-gold-deep">
+        <span className="inline-block h-px w-5 bg-gold" /> From the atelier — real pieces
+      </p>
+      <div className="grid gap-2.5 sm:grid-cols-2">
+        {items.map((p) => (
+          <PhotoCard key={p.id} p={p} selected={selectedId === p.id} onSelect={() => onPick(p)} />
+        ))}
+      </div>
+      {hint && <p className="mt-2.5 text-[11.5px] leading-relaxed text-ink-faint">{hint}</p>}
+    </div>
+  );
+}
+
 export default function Configurator() {
-  const { draft, setDraft, addToCart, saved, saveDesign, deleteDesign, notify } = useStore();
+  const { draft, setDraft, addToCart, saved, saveDesign, deleteDesign, notify, products, navigate } = useStore();
   const [config, setConfig] = useState<CandleConfig>(() => (draft ? { ...draft } : { ...DEFAULT_CONFIG }));
   const [openIdx, setOpenIdx] = useState(0);
   const [showSaved, setShowSaved] = useState(false);
@@ -135,8 +191,21 @@ export default function Configurator() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const total = useMemo(() => computeTotal(config), [config]);
-  const lines = useMemo(() => summaryLines(config), [config]);
+  const total = useMemo(() => computeTotal(config, products), [config, products]);
+  const lines = useMemo(() => summaryLines(config, products), [config, products]);
+
+  const shelfFor = (cat: string) => products.filter((p) => p.category === cat);
+  const toggleExtra = (cat: string, id: string) =>
+    setConfig((c) => {
+      const ex = { ...(c.customExtras ?? {}) };
+      if (ex[cat] === id) delete ex[cat];
+      else ex[cat] = id;
+      return { ...c, customExtras: ex };
+    });
+  const selectedCustoms: CustomProduct[] = useMemo(() => {
+    const ids = [config.customCandle, ...Object.values(config.customExtras ?? {})];
+    return ids.map((id) => products.find((p) => p.id === id)).filter((p): p is CustomProduct => !!p);
+  }, [config.customCandle, config.customExtras, products]);
 
   /* compatibility guard: reset holder when it no longer fits the candle */
   useEffect(() => {
@@ -150,8 +219,9 @@ export default function Configurator() {
   const set = <K extends keyof CandleConfig>(key: K, value: CandleConfig[K]) => setConfig((c) => ({ ...c, [key]: value }));
 
   const candleName = getOption("candle", config.candle)?.name ?? "";
+  const customCandleProduct = config.customCandle ? products.find((p) => p.id === config.customCandle) : undefined;
   const sections = [
-    { title: "The Candle", current: candleName },
+    { title: "The Candle", current: customCandleProduct ? `${customCandleProduct.name} (atelier)` : candleName },
     { title: "Ribbons", current: getOption("ribbon", config.ribbon)?.name },
     { title: "Child's Name", current: config.nameOn ? config.childName.trim() || "Engraving on" : "Not engraved" },
     { title: "Candle Holder", current: getOption("holder", config.holder)?.name },
@@ -178,6 +248,19 @@ export default function Configurator() {
               <p className="mt-4 max-w-lg text-[14.5px] leading-relaxed text-ink-soft">
                 A light made uniquely yours. Compose the candle piece by piece — the preview listens with every choice.
               </p>
+              {products.length === 0 && (
+                <p className="mt-3 text-[12.5px] text-ink-faint">
+                  Are you the artisan?{" "}
+                  <button
+                    type="button"
+                    onClick={() => navigate("admin")}
+                    className="border-b border-gold-soft font-semibold text-gold-deep transition-colors hover:border-gold-deep hover:text-ink"
+                  >
+                    Add your real candles & accessories from the Atelier Manager
+                  </button>{" "}
+                  — they will appear in these very sections.
+                </p>
+              )}
             </div>
             <button
               type="button"
@@ -229,6 +312,20 @@ export default function Configurator() {
               <div className="relative">
                 <CandlePreview config={config} interactive className="mx-auto max-w-[430px] px-4 pt-2" />
               </div>
+              {selectedCustoms.length > 0 && (
+                <div className="fade-soft relative border-t border-gold-pale bg-ivory/85 px-5 py-3.5">
+                  <p className="mb-2.5 text-[9.5px] font-bold uppercase tracking-[0.24em] text-gold-deep">Atelier pieces in this composition</p>
+                  <div className="flex gap-2.5 overflow-x-auto pb-1">
+                    {selectedCustoms.map((p) => (
+                      <span key={p.id} className="flex shrink-0 items-center gap-2.5 border border-gold-pale bg-shell py-1.5 pl-1.5 pr-3">
+                        <img src={p.image} alt={p.name} className="h-9 w-9 object-cover" loading="lazy" />
+                        <span className="text-[11.5px] font-semibold text-ink">{p.name}</span>
+                        <span className="text-[11.5px] font-bold text-gold-deep">{fmt(p.price)}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
               <p className="relative border-t border-gold-pale bg-ivory/80 px-5 py-3 text-center text-[10.5px] font-semibold uppercase tracking-[0.24em] text-ink-faint">
                 Live preview · updates with every choice
               </p>
@@ -251,9 +348,26 @@ export default function Configurator() {
             <div className="space-y-3">
               {/* 01 — candle */}
               <Section index="01" title={sections[0].title} current={sections[0].current} open={openIdx === 0} onToggle={() => toggle(0)}>
-                <div className="grid gap-2.5 sm:grid-cols-2">
+                {shelfFor("candle").length > 0 && (
+                  <AtelierShelf
+                    items={shelfFor("candle")}
+                    selectedId={config.customCandle}
+                    onPick={(p) => set("customCandle", p.id)}
+                    hint="The candle you receive is the one pictured. The silhouette in the preview simply shows where ribbons, blossoms and the name will rest."
+                  />
+                )}
+                <p className={`mb-2.5 text-[10.5px] font-bold uppercase tracking-[0.2em] text-ink-faint ${shelfFor("candle").length > 0 ? "mt-5" : ""}`}>
+                  {config.customCandle ? "Classic bases (used as decoration canvas)" : "Choose the base"}
+                </p>
+                <div className={`grid gap-2.5 sm:grid-cols-2 ${config.customCandle ? "opacity-70" : ""}`}>
                   {CANDLES.map((o) => (
-                    <OptionCard key={o.id} opt={o} selected={config.candle === o.id} onSelect={() => set("candle", o.id)} priceLabel={priceLabel(o, true)} />
+                    <OptionCard
+                      key={o.id}
+                      opt={o}
+                      selected={!config.customCandle && config.candle === o.id}
+                      onSelect={() => setConfig((c) => ({ ...c, candle: o.id, customCandle: null }))}
+                      priceLabel={priceLabel(o, true)}
+                    />
                   ))}
                 </div>
               </Section>
@@ -266,6 +380,7 @@ export default function Configurator() {
                     <OptionCard key={o.id} opt={o} selected={config.ribbon === o.id} onSelect={() => set("ribbon", o.id)} priceLabel={priceLabel(o)} />
                   ))}
                 </div>
+                <AtelierShelf items={shelfFor("ribbon")} selectedId={(config.customExtras ?? {})["ribbon"]} onPick={(p) => toggleExtra("ribbon", p.id)} />
                 <p className="mt-5 mb-2.5 text-[10.5px] font-bold uppercase tracking-[0.2em] text-ink-faint">How it is tied</p>
                 <div className="grid grid-cols-3 gap-2">
                   {BOW_STYLES.map((b) => (
@@ -404,6 +519,7 @@ export default function Configurator() {
                     );
                   })}
                 </div>
+                <AtelierShelf items={shelfFor("holder")} selectedId={(config.customExtras ?? {})["holder"]} onPick={(p) => toggleExtra("holder", p.id)} />
               </Section>
 
               {/* 05 — towel */}
@@ -413,6 +529,7 @@ export default function Configurator() {
                     <OptionCard key={o.id} opt={o} selected={config.towel === o.id} onSelect={() => set("towel", o.id)} priceLabel={priceLabel(o)} />
                   ))}
                 </div>
+                <AtelierShelf items={shelfFor("towel")} selectedId={(config.customExtras ?? {})["towel"]} onPick={(p) => toggleExtra("towel", p.id)} />
               </Section>
 
               {/* 06 — additional candles */}
@@ -422,6 +539,7 @@ export default function Configurator() {
                     <OptionCard key={o.id} opt={o} selected={config.extra === o.id} onSelect={() => set("extra", o.id)} priceLabel={priceLabel(o)} />
                   ))}
                 </div>
+                <AtelierShelf items={shelfFor("extra")} selectedId={(config.customExtras ?? {})["extra"]} onPick={(p) => toggleExtra("extra", p.id)} />
                 <p className="mt-3 text-[11.5px] text-ink-faint">Attendant tapers stand behind your candle — a quiet honour for the godparents.</p>
               </Section>
 
@@ -432,6 +550,7 @@ export default function Configurator() {
                     <OptionCard key={o.id} opt={o} selected={config.toy === o.id} onSelect={() => set("toy", o.id)} priceLabel={priceLabel(o)} />
                   ))}
                 </div>
+                <AtelierShelf items={shelfFor("toy")} selectedId={(config.customExtras ?? {})["toy"]} onPick={(p) => toggleExtra("toy", p.id)} />
               </Section>
 
               {/* 08 — crosses & chains */}
@@ -441,6 +560,7 @@ export default function Configurator() {
                     <OptionCard key={o.id} opt={o} selected={config.cross === o.id} onSelect={() => set("cross", o.id)} priceLabel={priceLabel(o)} />
                   ))}
                 </div>
+                <AtelierShelf items={shelfFor("cross")} selectedId={(config.customExtras ?? {})["cross"]} onPick={(p) => toggleExtra("cross", p.id)} />
               </Section>
 
               {/* 09 — blossoms */}
@@ -450,6 +570,7 @@ export default function Configurator() {
                     <OptionCard key={o.id} opt={o} selected={config.flower === o.id} onSelect={() => set("flower", o.id)} priceLabel={priceLabel(o)} />
                   ))}
                 </div>
+                <AtelierShelf items={shelfFor("flower")} selectedId={(config.customExtras ?? {})["flower"]} onPick={(p) => toggleExtra("flower", p.id)} />
               </Section>
             </div>
 

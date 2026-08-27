@@ -1,11 +1,12 @@
 import CandlePreview from "../components/CandlePreview";
 import Reveal from "../components/Reveal";
-import { ArrowIcon, BagIcon, FlameIcon } from "../components/Ornaments";
+import { ArrowIcon, BagIcon, BlossomIcon, FlameIcon } from "../components/Ornaments";
 import { useStore } from "../context/StoreContext";
 import { computeTotal, fmt, summaryLines } from "../data/catalog";
+import { CATEGORY_LABELS } from "../data/products";
 
 export default function Cart() {
-  const { cart, setQty, removeItem, cartTotal, navigate, setDraft, notify } = useStore();
+  const { cart, setQty, removeItem, cartTotal, navigate, setDraft, notify, products } = useStore();
 
   if (cart.length === 0) {
     return (
@@ -45,8 +46,42 @@ export default function Cart() {
       <div className="mt-12 grid gap-10 lg:grid-cols-[1.5fr_0.9fr]">
         <div className="space-y-6">
           {cart.map((item, idx) => {
-            const lines = summaryLines(item.config);
-            const unit = computeTotal(item.config);
+            if (item.product) {
+              const p = item.product;
+              return (
+                <Reveal key={item.id} delay={idx * 90}>
+                  <article className="grid gap-6 border border-gold-pale bg-shell p-5 sm:grid-cols-[200px_1fr] sm:p-6">
+                    <div className="mx-auto w-full max-w-[200px] overflow-hidden border border-gold-pale bg-cream">
+                      <img src={p.image} alt={p.name} className="aspect-square w-full object-cover" loading="lazy" />
+                    </div>
+                    <div className="flex flex-col">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <h2 className="font-display text-2xl font-medium text-ink">{p.name}</h2>
+                          <p className="mt-1 flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-[0.18em] text-gold-deep">
+                            <BlossomIcon className="h-3.5 w-3.5" /> {CATEGORY_LABELS[p.category]} · from the atelier
+                          </p>
+                        </div>
+                        <p className="font-display text-2xl font-medium text-ink">{fmt(p.price * item.qty)}</p>
+                      </div>
+                      <p className="mt-3 text-[13px] leading-relaxed text-ink-soft">{p.description}</p>
+                      <div className="mt-5 flex flex-wrap items-center justify-between gap-4">
+                        <div className="flex items-center border border-gold-soft">
+                          <button type="button" onClick={() => setQty(item.id, item.qty - 1)} aria-label="Decrease quantity" className="px-3.5 py-2 text-ink-soft transition-colors hover:bg-cream hover:text-ink">−</button>
+                          <span className="w-8 text-center text-sm font-bold text-ink">{item.qty}</span>
+                          <button type="button" onClick={() => setQty(item.id, item.qty + 1)} aria-label="Increase quantity" className="px-3.5 py-2 text-ink-soft transition-colors hover:bg-cream hover:text-ink">+</button>
+                        </div>
+                        <button type="button" onClick={() => removeItem(item.id)} className="text-[11px] font-bold uppercase tracking-[0.18em] text-ink-faint transition-colors hover:text-rose">
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                </Reveal>
+              );
+            }
+            const lines = summaryLines(item.config, products);
+            const unit = computeTotal(item.config, products);
             const childName = item.config.nameOn && item.config.childName.trim() ? item.config.childName.trim() : null;
             return (
               <Reveal key={item.id} delay={idx * 90}>

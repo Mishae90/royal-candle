@@ -22,7 +22,7 @@ import { IMAGES } from "../data/images";
 const WORDS = ["Faith", "Light", "Purity", "Love", "Family", "Tradition", "Grace", "Beginning"];
 
 export default function Home() {
-  const { navigate, setDraft } = useStore();
+  const { navigate, setDraft, products, addProductToCart } = useStore();
 
   return (
     <main id="top">
@@ -322,6 +322,56 @@ export default function Home() {
           ))}
         </div>
       </section>
+
+      {/* ================= LA BOUTIQUE — live shelf of real creations ================= */}
+      {products.length > 0 && (
+        <section className="border-y border-gold-pale bg-cream/60 py-20 lg:py-24">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6">
+            <div className="flex flex-wrap items-end justify-between gap-6">
+              <Reveal>
+                <p className="text-[11px] font-bold uppercase tracking-[0.34em] text-gold-deep">La Boutique</p>
+                <h2 className="mt-4 font-display text-4xl font-medium leading-[1.08] text-ink sm:text-5xl">
+                  Fresh from <em className="text-gold-deep italic">the atelier</em>
+                </h2>
+              </Reveal>
+              <Reveal delay={120}>
+                <button
+                  type="button"
+                  onClick={() => navigate("boutique")}
+                  className="group inline-flex items-center gap-2 border-b border-gold-soft pb-1 text-[11.5px] font-bold uppercase tracking-[0.22em] text-ink transition-colors hover:border-gold-deep hover:text-gold-deep"
+                >
+                  Enter the boutique
+                  <ArrowIcon className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1" />
+                </button>
+              </Reveal>
+            </div>
+            <div className="mt-10 flex snap-x gap-5 overflow-x-auto pb-3">
+              {products.slice(0, 8).map((p, i) => (
+                <Reveal key={p.id} delay={i * 80} className="w-[240px] shrink-0 snap-start sm:w-[270px]">
+                  <article className="group flex h-full flex-col border border-gold-pale bg-ivory transition-all duration-500 hover:-translate-y-1.5 hover:shadow-luxe">
+                    <div className="aspect-square overflow-hidden bg-cream">
+                      <img src={p.image} alt={p.name} loading="lazy" className="h-full w-full object-cover transition-transform duration-[1400ms] ease-out group-hover:scale-[1.06]" />
+                    </div>
+                    <div className="flex flex-1 flex-col p-5">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <h3 className="truncate font-display text-xl font-medium text-ink">{p.name}</h3>
+                        <span className="shrink-0 font-display text-lg text-gold-deep">{fmt(p.price)}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => addProductToCart(p)}
+                        className="mt-4 self-start border border-gold-soft px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.18em] text-ink transition-all duration-300 hover:border-gold hover:bg-gold hover:text-ivory"
+                      >
+                        Add to cart
+                      </button>
+                    </div>
+                  </article>
+                </Reveal>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ================= THE ROYAL STANDARD ================= */}
       <section className="border-y border-gold-pale bg-cream/60 py-24 lg:py-28">

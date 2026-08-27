@@ -3,7 +3,9 @@ import Footer from "./components/Footer";
 import Header from "./components/Header";
 import { CheckIcon } from "./components/Ornaments";
 import { StoreProvider, useStore } from "./context/StoreContext";
+import Admin from "./pages/Admin";
 import Baptism from "./pages/Baptism";
+import Boutique from "./pages/Boutique";
 import Cart from "./pages/Cart";
 import { Checkout, Confirmation } from "./pages/Checkout";
 import Configurator from "./pages/Configurator";
@@ -24,6 +26,8 @@ const TITLES: Record<string, string> = {
   cart: "Your Cart — Royal Candle",
   checkout: "Checkout — Royal Candle",
   confirmation: "Order Confirmed — Royal Candle",
+  boutique: "La Boutique — Candles & Keepsakes | Royal Candle",
+  admin: "Atelier Manager — Royal Candle",
 };
 
 function Toast() {
@@ -62,6 +66,8 @@ function Shell() {
       {page === "cart" && <Cart />}
       {page === "checkout" && <Checkout />}
       {page === "confirmation" && <Confirmation />}
+      {page === "boutique" && <Boutique />}
+      {page === "admin" && <Admin />}
       <Footer />
       <Toast />
     </div>

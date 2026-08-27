@@ -2,7 +2,11 @@
    ROYAL CANDLE — Configurator data model
    Every option is a record: id / name / price / swatches / description
    / compatibility. Adding a new option = adding one record.
+   Real (uploaded) products can join any section via the `custom`
+   fields of a configuration — see src/data/products.ts.
 ------------------------------------------------------------------- */
+
+import type { CustomProduct } from "./products";
 
 export interface OptionDef {
   id: string;
@@ -31,6 +35,10 @@ export interface CandleConfig {
   toy: string;
   cross: string;
   flower: string;
+  /** id of a real (uploaded) candle used as the base — replaces the built-in candle price */
+  customCandle?: string | null;
+  /** categoryId -> id of a real (uploaded) accessory added on top of built-ins */
+  customExtras?: Record<string, string>;
 }
 
 export const DEFAULT_CONFIG: CandleConfig = {
@@ -130,9 +138,11 @@ export function getOption(group: string, id: string): OptionDef | undefined {
   return GROUPS[group]?.find((o) => o.id === id);
 }
 
-export function computeTotal(c: CandleConfig): number {
+export function computeTotal(c: CandleConfig, products?: CustomProduct[]): number {
+  const find = (id?: string | null) => products?.find((p) => p.id === id);
   let total = 0;
-  total += getOption("candle", c.candle)?.price ?? 0;
+  const customCandle = find(c.customCandle);
+  total += customCandle ? customCandle.price : getOption("candle", c.candle)?.price ?? 0;
   total += getOption("ribbon", c.ribbon)?.price ?? 0;
   if (c.nameOn) total += NAME_PRICE;
   total += getOption("holder", c.holder)?.price ?? 0;
@@ -141,6 +151,12 @@ export function computeTotal(c: CandleConfig): number {
   total += getOption("toy", c.toy)?.price ?? 0;
   total += getOption("cross", c.cross)?.price ?? 0;
   total += getOption("flower", c.flower)?.price ?? 0;
+  if (c.customExtras) {
+    Object.values(c.customExtras).forEach((id) => {
+      const p = find(id);
+      if (p) total += p.price;
+    });
+  }
   return total;
 }
 
@@ -150,10 +166,13 @@ export interface SummaryLine {
   price: number;
 }
 
-export function summaryLines(c: CandleConfig): SummaryLine[] {
+export function summaryLines(c: CandleConfig, products?: CustomProduct[]): SummaryLine[] {
   const lines: SummaryLine[] = [];
+  const find = (id?: string | null) => products?.find((p) => p.id === id);
+  const customCandle = find(c.customCandle);
   const candle = getOption("candle", c.candle);
-  if (candle) lines.push({ label: "Candle", value: candle.name, price: candle.price });
+  if (customCandle) lines.push({ label: "Candle", value: `${customCandle.name} (atelier)`, price: customCandle.price });
+  else if (candle) lines.push({ label: "Candle", value: candle.name, price: candle.price });
   const ribbon = getOption("ribbon", c.ribbon);
   const bow = getOption("bow", c.bow);
   if (ribbon) lines.push({ label: "Ribbon", value: `${ribbon.name} · ${bow?.name ?? ""}`, price: ribbon.price });
@@ -175,6 +194,25 @@ export function summaryLines(c: CandleConfig): SummaryLine[] {
   if (cross && cross.id !== "none") lines.push({ label: "Cross & Chain", value: cross.name, price: cross.price });
   const flower = getOption("flower", c.flower);
   if (flower && flower.id !== "none") lines.push({ label: "Flowers", value: flower.name, price: flower.price });
+  if (c.customExtras) {
+    Object.entries(c.customExtras).forEach(([cat, id]) => {
+      const p = find(id);
+      if (p) {
+        const labelMap: Record<string, string> = {
+          candle: "Candle",
+          ribbon: "Ribbon",
+          holder: "Holder",
+          towel: "Towel",
+          extra: "Candles",
+          toy: "Keepsake",
+          cross: "Cross & Chain",
+          flower: "Flowers",
+          boutique: "Boutique",
+        };
+        lines.push({ label: labelMap[cat] ?? "Atelier", value: `${p.name} (atelier)`, price: p.price });
+      }
+    });
+  }
   return lines;
 }
 

@@ -12,7 +12,7 @@ const field =
 const label = "mb-1.5 block text-[10.5px] font-bold uppercase tracking-[0.2em] text-ink-faint";
 
 export function Checkout() {
-  const { cart, cartTotal, placeOrder, navigate } = useStore();
+  const { cart, cartTotal, placeOrder, navigate, products } = useStore();
   const [form, setForm] = useState({
     email: "",
     name: "",
@@ -56,7 +56,11 @@ export function Checkout() {
     setErrors(errs);
     if (Object.keys(errs).length > 0) return;
     setPlacing(true);
-    const lines = cart.map((i) => ({ itemLines: summaryLines(i.config), qty: i.qty, total: computeTotal(i.config) }));
+    const lines = cart.map((i) =>
+      i.product
+        ? { itemLines: [] as ReturnType<typeof summaryLines>, qty: i.qty, total: i.product.price, product: { name: i.product.name, image: i.product.image } }
+        : { itemLines: summaryLines(i.config, products), qty: i.qty, total: computeTotal(i.config, products), product: undefined },
+    );
     window.setTimeout(() => {
       placeOrder({ email: form.email, name: form.name, shipping: form.shipping }, lines);
       navigate("confirmation");
@@ -190,16 +194,25 @@ export function Checkout() {
             <div className="mt-5 space-y-5">
               {cart.map((item) => {
                 const childName = item.config.nameOn && item.config.childName.trim() ? item.config.childName.trim() : null;
+                const unit = item.product ? item.product.price : computeTotal(item.config, products);
                 return (
                   <div key={item.id} className="flex items-center gap-4 border-b border-ivory/10 pb-5">
-                    <div className="w-20 shrink-0 border border-ivory/15 bg-ivory">
-                      <CandlePreview config={item.config} lit={false} />
+                    <div className="w-20 shrink-0 overflow-hidden border border-ivory/15 bg-ivory">
+                      {item.product ? (
+                        <img src={item.product.image} alt={item.product.name} className="aspect-square w-full object-cover" loading="lazy" />
+                      ) : (
+                        <CandlePreview config={item.config} lit={false} />
+                      )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[13px] font-semibold">Custom Baptism Candle{childName ? ` · “${childName}”` : ""}</p>
-                      <p className="text-[11.5px] text-ivory/55">Qty {item.qty} · {fmt(computeTotal(item.config))} each</p>
+                      <p className="truncate text-[13px] font-semibold">
+                        {item.product ? item.product.name : `Custom Baptism Candle${childName ? ` · “${childName}”` : ""}`}
+                      </p>
+                      <p className="text-[11.5px] text-ivory/55">
+                        {item.product ? "From the atelier · " : ""}Qty {item.qty} · {fmt(unit)} each
+                      </p>
                     </div>
-                    <p className="shrink-0 font-display text-lg text-gold-soft">{fmt(computeTotal(item.config) * item.qty)}</p>
+                    <p className="shrink-0 font-display text-lg text-gold-soft">{fmt(unit * item.qty)}</p>
                   </div>
                 );
               })}
@@ -291,15 +304,29 @@ export function Confirmation() {
           {o.lines.map((l, i) => (
             <div key={i} className="grid gap-4 sm:grid-cols-[1fr_auto]">
               <div>
-                <p className="font-display text-xl font-medium text-ink">Royal Candle — Custom Baptism Candle × {l.qty}</p>
-                <ul className="mt-2 grid gap-x-8 gap-y-1 text-[12.5px] text-ink-soft sm:grid-cols-2">
-                  {l.itemLines.map((line) => (
-                    <li key={line.label}>
-                      <span className="text-ink-faint">{line.label}: </span>
-                      {line.value}
-                    </li>
-                  ))}
-                </ul>
+                {l.product ? (
+                  <div className="flex items-center gap-4">
+                    <img src={l.product.image} alt={l.product.name} className="h-16 w-16 border border-gold-pale object-cover" loading="lazy" />
+                    <div>
+                      <p className="font-display text-xl font-medium text-ink">
+                        {l.product.name} × {l.qty}
+                      </p>
+                      <p className="text-[10.5px] font-bold uppercase tracking-[0.18em] text-gold-deep">From the atelier</p>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <p className="font-display text-xl font-medium text-ink">Royal Candle — Custom Baptism Candle × {l.qty}</p>
+                    <ul className="mt-2 grid gap-x-8 gap-y-1 text-[12.5px] text-ink-soft sm:grid-cols-2">
+                      {l.itemLines.map((line) => (
+                        <li key={line.label}>
+                          <span className="text-ink-faint">{line.label}: </span>
+                          {line.value}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
               </div>
               <p className="font-display text-xl text-gold-deep">{fmt(l.total * l.qty)}</p>
             </div>
